@@ -140,25 +140,13 @@ mod tests2 {
             use std::io::{Error, ErrorKind::InvalidData};
             let err = Error::new(InvalidData, "Output slice too small").to_string();
             let e = EngineKind::Standard;
-            assert_eq!(
-                err,
-                encode_slice(&input, &mut vec, e).unwrap_err().to_string()
-            );
+            assert_eq!(err, encode_slice(&input, &mut vec, e).unwrap_err().to_string());
             vec.push(0);
-            assert_eq!(
-                err,
-                encode_slice(&input, &mut vec, e).unwrap_err().to_string()
-            );
+            assert_eq!(err, encode_slice(&input, &mut vec, e).unwrap_err().to_string());
             vec.push(0);
-            assert_eq!(
-                err,
-                encode_slice(&input, &mut vec, e).unwrap_err().to_string()
-            );
+            assert_eq!(err, encode_slice(&input, &mut vec, e).unwrap_err().to_string());
             vec.push(0);
-            assert_eq!(
-                err,
-                encode_slice(&input, &mut vec, e).unwrap_err().to_string()
-            );
+            assert_eq!(err, encode_slice(&input, &mut vec, e).unwrap_err().to_string());
             vec.push(0);
             assert_eq!(num_triples * 4, encode_slice(&input, &mut vec, e).unwrap());
         }

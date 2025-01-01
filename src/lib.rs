@@ -25,11 +25,7 @@ pub fn encode<T: AsRef<[u8]>>(bytes: T, engine: EngineKind) -> String {
 }
 
 /// Encode bytes to base64 string into a pre-allocated buffer.
-pub fn encode_slice<T: AsRef<[u8]>>(
-    bytes: T,
-    output_buf: &mut [u8],
-    engine: EngineKind,
-) -> Result<usize, Error> {
+pub fn encode_slice<T: AsRef<[u8]>>(bytes: T, output_buf: &mut [u8], engine: EngineKind) -> Result<usize, Error> {
     match engine {
         EngineKind::Standard => STANDARD.encode_slice(bytes, output_buf),
         EngineKind::StandardNoPad => STANDARD_NO_PAD.encode_slice(bytes, output_buf),
@@ -50,11 +46,7 @@ pub fn decode<T: AsRef<[u8]>>(b64str: T, engine: EngineKind) -> Result<Vec<u8>, 
 }
 
 /// Decode base64 string to bytes into a pre-allocated buffer.
-pub fn decode_slice<T: AsRef<[u8]>>(
-    b64str: T,
-    output: &mut [u8],
-    engine: EngineKind,
-) -> Result<usize, Error> {
+pub fn decode_slice<T: AsRef<[u8]>>(b64str: T, output: &mut [u8], engine: EngineKind) -> Result<usize, Error> {
     match engine {
         EngineKind::Standard => STANDARD.decode_slice(b64str, output),
         EngineKind::StandardNoPad => STANDARD_NO_PAD.decode_slice(b64str, output),
@@ -71,19 +63,14 @@ pub(crate) trait Engine: Send + Sync {
 
     fn internal_encode(&self, input: &[u8], output: &mut [u8]) -> usize;
     fn internal_decoded_len_estimate(&self, input_len: usize) -> Self::DecodeEstimate;
-    fn internal_decode(
-        &self,
-        input: &[u8],
-        output: &mut [u8],
-        decode_estimate: Self::DecodeEstimate,
-    ) -> Result<DecodeMetadata, Error>;
+    fn internal_decode(&self, input: &[u8], output: &mut [u8], decode_estimate: Self::DecodeEstimate) -> Result<DecodeMetadata, Error>;
 
     #[cfg(feature = "alloc")]
     #[inline]
     fn encode<T: AsRef<[u8]>>(&self, input: T) -> String {
         fn inner<E: Engine + ?Sized>(engine: &E, input_bytes: &[u8]) -> String {
-            let encoded_size = encoded_len(input_bytes.len(), engine.config().encode_padding())
-                .expect("integer overflow when calculating buffer size");
+            let encoded_size =
+                encoded_len(input_bytes.len(), engine.config().encode_padding()).expect("integer overflow when calculating buffer size");
 
             let mut buf = vec![0; encoded_size];
 
@@ -96,17 +83,13 @@ pub(crate) trait Engine: Send + Sync {
     }
 
     #[inline]
-    fn encode_slice<T: AsRef<[u8]>>(
-        &self,
-        input: T,
-        output_buf: &mut [u8],
-    ) -> Result<usize, Error> {
+    fn encode_slice<T: AsRef<[u8]>>(&self, input: T, output_buf: &mut [u8]) -> Result<usize, Error> {
         fn inner<E>(engine: &E, input_bytes: &[u8], output_buf: &mut [u8]) -> Result<usize, Error>
         where
             E: Engine + ?Sized,
         {
-            let encoded_size = encoded_len(input_bytes.len(), engine.config().encode_padding())
-                .expect("usize overflow when calculating buffer size");
+            let encoded_size =
+                encoded_len(input_bytes.len(), engine.config().encode_padding()).expect("usize overflow when calculating buffer size");
 
             if output_buf.len() < encoded_size {
                 return Err(Error::OutputSliceTooSmall);
@@ -129,9 +112,7 @@ pub(crate) trait Engine: Send + Sync {
             let estimate = engine.internal_decoded_len_estimate(input_bytes.len());
             let mut buffer = vec![0; estimate.decoded_len_estimate()];
 
-            let bytes_written = engine
-                .internal_decode(input_bytes, &mut buffer, estimate)?
-                .decoded_len;
+            let bytes_written = engine.internal_decode(input_bytes, &mut buffer, estimate)?.decoded_len;
 
             buffer.truncate(bytes_written);
 
@@ -143,17 +124,9 @@ pub(crate) trait Engine: Send + Sync {
 
     #[inline]
     fn decode_slice<T: AsRef<[u8]>>(&self, input: T, output: &mut [u8]) -> Result<usize, Error> {
-        fn inner<E: Engine + ?Sized>(
-            eng: &E,
-            input: &[u8],
-            output: &mut [u8],
-        ) -> Result<usize, Error> {
-            eng.internal_decode(
-                input,
-                output,
-                eng.internal_decoded_len_estimate(input.len()),
-            )
-            .map(|dm| dm.decoded_len)
+        fn inner<E: Engine + ?Sized>(eng: &E, input: &[u8], output: &mut [u8]) -> Result<usize, Error> {
+            let decode_estimate = eng.internal_decoded_len_estimate(input.len());
+            eng.internal_decode(input, output, decode_estimate).map(|dm| dm.decoded_len)
         }
 
         inner(self, input.as_ref(), output)
@@ -193,12 +166,11 @@ pub const fn encoded_len(bytes_len: usize, padding: bool) -> Option<usize> {
     let complete_input_chunks = bytes_len / 3;
     // `?` is disallowed in const, and `let Some(_) = _ else` requires 1.65.0, whereas this
     // messier syntax works on 1.48
-    let complete_chunk_output =
-        if let Some(complete_chunk_output) = complete_input_chunks.checked_mul(4) {
-            complete_chunk_output
-        } else {
-            return None;
-        };
+    let complete_chunk_output = if let Some(complete_chunk_output) = complete_input_chunks.checked_mul(4) {
+        complete_chunk_output
+    } else {
+        return None;
+    };
 
     if rem > 0 {
         if padding {
@@ -236,17 +208,10 @@ pub const fn encoded_len(bytes_len: usize, padding: bool) -> Option<usize> {
 /// assert_eq!(6, decoded_len_estimate(5));
 /// ```
 pub fn decoded_len_estimate(encoded_len: usize) -> usize {
-    STANDARD
-        .internal_decoded_len_estimate(encoded_len)
-        .decoded_len_estimate()
+    STANDARD.internal_decoded_len_estimate(encoded_len).decoded_len_estimate()
 }
 
-pub(crate) fn encode_with_padding<E: Engine + ?Sized>(
-    input: &[u8],
-    output: &mut [u8],
-    engine: &E,
-    expected_encoded_size: usize,
-) {
+pub(crate) fn encode_with_padding<E: Engine + ?Sized>(input: &[u8], output: &mut [u8], engine: &E, expected_encoded_size: usize) {
     debug_assert_eq!(expected_encoded_size, output.len());
 
     let b64_bytes_written = engine.internal_encode(input, output);
@@ -314,10 +279,8 @@ impl Engine for GeneralPurpose {
             while input_index <= last_fast_index {
                 // Major performance wins from letting the optimizer do the bounds check once, mostly
                 // on the output side
-                let input_chunk =
-                    &input[input_index..(input_index + (BLOCKS_PER_FAST_LOOP * 6 + 2))];
-                let output_chunk =
-                    &mut output[output_index..(output_index + BLOCKS_PER_FAST_LOOP * 8)];
+                let input_chunk = &input[input_index..(input_index + (BLOCKS_PER_FAST_LOOP * 6 + 2))];
+                let output_chunk = &mut output[output_index..(output_index + BLOCKS_PER_FAST_LOOP * 8)];
 
                 // Hand-unrolling for 32 vs 16 or 8 bytes produces yields performance about equivalent
                 // to unsafe pointer code on a Xeon E5-1650v3. 64 byte unrolling was slightly better for
@@ -390,10 +353,8 @@ impl Engine for GeneralPurpose {
             let output_chunk = &mut output[output_index..(output_index + 4)];
 
             output_chunk[0] = self.encode_table[(input_chunk[0] >> 2) as usize];
-            output_chunk[1] = self.encode_table
-                [((input_chunk[0] << 4 | input_chunk[1] >> 4) & LOW_SIX_BITS_U8) as usize];
-            output_chunk[2] = self.encode_table
-                [((input_chunk[1] << 2 | input_chunk[2] >> 6) & LOW_SIX_BITS_U8) as usize];
+            output_chunk[1] = self.encode_table[((input_chunk[0] << 4 | input_chunk[1] >> 4) & LOW_SIX_BITS_U8) as usize];
+            output_chunk[2] = self.encode_table[((input_chunk[1] << 2 | input_chunk[2] >> 6) & LOW_SIX_BITS_U8) as usize];
             output_chunk[3] = self.encode_table[(input_chunk[2] & LOW_SIX_BITS_U8) as usize];
 
             input_index += 3;
@@ -403,15 +364,12 @@ impl Engine for GeneralPurpose {
         if rem == 2 {
             output[output_index] = self.encode_table[(input[start_of_rem] >> 2) as usize];
             output[output_index + 1] =
-                self.encode_table[((input[start_of_rem] << 4 | input[start_of_rem + 1] >> 4)
-                    & LOW_SIX_BITS_U8) as usize];
-            output[output_index + 2] =
-                self.encode_table[((input[start_of_rem + 1] << 2) & LOW_SIX_BITS_U8) as usize];
+                self.encode_table[((input[start_of_rem] << 4 | input[start_of_rem + 1] >> 4) & LOW_SIX_BITS_U8) as usize];
+            output[output_index + 2] = self.encode_table[((input[start_of_rem + 1] << 2) & LOW_SIX_BITS_U8) as usize];
             output_index += 3;
         } else if rem == 1 {
             output[output_index] = self.encode_table[(input[start_of_rem] >> 2) as usize];
-            output[output_index + 1] =
-                self.encode_table[((input[start_of_rem] << 4) & LOW_SIX_BITS_U8) as usize];
+            output[output_index + 1] = self.encode_table[((input[start_of_rem] << 4) & LOW_SIX_BITS_U8) as usize];
             output_index += 2;
         }
 
@@ -422,12 +380,7 @@ impl Engine for GeneralPurpose {
         GeneralPurposeEstimate::new(input_len)
     }
 
-    fn internal_decode(
-        &self,
-        input: &[u8],
-        output: &mut [u8],
-        estimate: Self::DecodeEstimate,
-    ) -> Result<DecodeMetadata, Error> {
+    fn internal_decode(&self, input: &[u8], output: &mut [u8], estimate: Self::DecodeEstimate) -> Result<DecodeMetadata, Error> {
         decode::decode_helper(
             input,
             estimate,
@@ -592,12 +545,8 @@ pub(crate) mod alphabet {
 
     pub(crate) const ALPHABET_SIZE: usize = 64;
 
-    pub(crate) const STANDARD: Alphabet = Alphabet::from_str_unchecked(
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
-    );
-    pub(crate) const URL_SAFE: Alphabet = Alphabet::from_str_unchecked(
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
-    );
+    pub(crate) const STANDARD: Alphabet = Alphabet::from_str_unchecked("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+    pub(crate) const URL_SAFE: Alphabet = Alphabet::from_str_unchecked("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
 }
 
 pub(crate) mod decode {
@@ -612,73 +561,39 @@ pub(crate) mod decode {
         decode_allow_trailing_bits: bool,
         padding_mode: DecodePaddingMode,
     ) -> Result<DecodeMetadata, Error> {
-        let input_complete_nonterminal_quads_len =
-            complete_quads_len(input, estimate.rem, output.len(), decode_table)?;
+        let input_complete_nonterminal_quads_len = complete_quads_len(input, estimate.rem, output.len(), decode_table)?;
 
         const UNROLLED_INPUT_CHUNK_SIZE: usize = 32;
         const UNROLLED_OUTPUT_CHUNK_SIZE: usize = UNROLLED_INPUT_CHUNK_SIZE / 4 * 3;
 
-        let input_complete_quads_after_unrolled_chunks_len =
-            input_complete_nonterminal_quads_len % UNROLLED_INPUT_CHUNK_SIZE;
+        let input_complete_quads_after_unrolled_chunks_len = input_complete_nonterminal_quads_len % UNROLLED_INPUT_CHUNK_SIZE;
 
-        let input_unrolled_loop_len =
-            input_complete_nonterminal_quads_len - input_complete_quads_after_unrolled_chunks_len;
+        let input_unrolled_loop_len = input_complete_nonterminal_quads_len - input_complete_quads_after_unrolled_chunks_len;
 
         // chunks of 32 bytes
-        for (chunk_index, chunk) in input[..input_unrolled_loop_len]
-            .chunks_exact(UNROLLED_INPUT_CHUNK_SIZE)
-            .enumerate()
-        {
+        for (chunk_index, chunk) in input[..input_unrolled_loop_len].chunks_exact(UNROLLED_INPUT_CHUNK_SIZE).enumerate() {
             let input_index = chunk_index * UNROLLED_INPUT_CHUNK_SIZE;
-            let chunk_output = &mut output[chunk_index * UNROLLED_OUTPUT_CHUNK_SIZE
-                ..(chunk_index + 1) * UNROLLED_OUTPUT_CHUNK_SIZE];
+            let chunk_output = &mut output[chunk_index * UNROLLED_OUTPUT_CHUNK_SIZE..(chunk_index + 1) * UNROLLED_OUTPUT_CHUNK_SIZE];
 
-            decode_chunk_8(
-                &chunk[0..8],
-                input_index,
-                decode_table,
-                &mut chunk_output[0..6],
-            )?;
-            decode_chunk_8(
-                &chunk[8..16],
-                input_index + 8,
-                decode_table,
-                &mut chunk_output[6..12],
-            )?;
-            decode_chunk_8(
-                &chunk[16..24],
-                input_index + 16,
-                decode_table,
-                &mut chunk_output[12..18],
-            )?;
-            decode_chunk_8(
-                &chunk[24..32],
-                input_index + 24,
-                decode_table,
-                &mut chunk_output[18..24],
-            )?;
+            decode_chunk_8(&chunk[0..8], input_index, decode_table, &mut chunk_output[0..6])?;
+            decode_chunk_8(&chunk[8..16], input_index + 8, decode_table, &mut chunk_output[6..12])?;
+            decode_chunk_8(&chunk[16..24], input_index + 16, decode_table, &mut chunk_output[12..18])?;
+            decode_chunk_8(&chunk[24..32], input_index + 24, decode_table, &mut chunk_output[18..24])?;
         }
 
         // remaining quads, except for the last possibly partial one, as it may have padding
         let output_unrolled_loop_len = input_unrolled_loop_len / 4 * 3;
         let output_complete_quad_len = input_complete_nonterminal_quads_len / 4 * 3;
         {
-            let output_after_unroll =
-                &mut output[output_unrolled_loop_len..output_complete_quad_len];
+            let output_after_unroll = &mut output[output_unrolled_loop_len..output_complete_quad_len];
 
-            for (chunk_index, chunk) in input
-                [input_unrolled_loop_len..input_complete_nonterminal_quads_len]
+            for (chunk_index, chunk) in input[input_unrolled_loop_len..input_complete_nonterminal_quads_len]
                 .chunks_exact(4)
                 .enumerate()
             {
                 let chunk_output = &mut output_after_unroll[chunk_index * 3..chunk_index * 3 + 3];
 
-                decode_chunk_4(
-                    chunk,
-                    input_unrolled_loop_len + chunk_index * 4,
-                    decode_table,
-                    chunk_output,
-                )?;
+                decode_chunk_4(chunk, input_unrolled_loop_len + chunk_index * 4, decode_table, chunk_output)?;
             }
         }
 
@@ -716,10 +631,7 @@ pub(crate) mod decode {
             .saturating_sub(input_len_rem)
             // if rem was 0, subtract 4 to avoid padding
             .saturating_sub((input_len_rem == 0) as usize * 4);
-        debug_assert!(
-            input.is_empty()
-                || (1..=4).contains(&(input.len() - input_complete_nonterminal_quads_len))
-        );
+        debug_assert!(input.is_empty() || (1..=4).contains(&(input.len() - input_complete_nonterminal_quads_len)));
 
         // check that everything except the last quad handled by decode_suffix will fit
         if output_len < input_complete_nonterminal_quads_len / 4 * 3 {
@@ -863,9 +775,7 @@ pub(crate) mod decode {
                     // Check for error #2.
                     // Either the previous byte was padding, in which case we would have already hit
                     // this case, or it wasn't, in which case this is the first such error.
-                    debug_assert!(
-                        leftover_index == 0 || (leftover_index == 1 && padding_bytes_count == 0)
-                    );
+                    debug_assert!(leftover_index == 0 || (leftover_index == 1 && padding_bytes_count == 0));
                     let bad_padding_index = input_index + leftover_index;
                     return Err(Error::InvalidByte(bad_padding_index, b));
                 }
@@ -883,10 +793,7 @@ pub(crate) mod decode {
             // non-suffix '=' in trailing chunk either. Report error as first
             // erroneous padding.
             if padding_bytes_count > 0 {
-                return Err(Error::InvalidByte(
-                    input_index + first_padding_offset,
-                    PAD_BYTE,
-                ));
+                return Err(Error::InvalidByte(input_index + first_padding_offset, PAD_BYTE));
             }
 
             last_symbol = b;
@@ -939,20 +846,15 @@ pub(crate) mod decode {
         let leftover_bytes_to_append = morsels_in_leftover * 6 / 8;
         // Put the up to 6 complete bytes as the high bytes.
         // Gain a couple percent speedup from nudging these ORs to use more ILP with a two-way split.
-        let mut leftover_num = (u32::from(morsels[0]) << 26)
-            | (u32::from(morsels[1]) << 20)
-            | (u32::from(morsels[2]) << 14)
-            | (u32::from(morsels[3]) << 8);
+        let mut leftover_num =
+            (u32::from(morsels[0]) << 26) | (u32::from(morsels[1]) << 20) | (u32::from(morsels[2]) << 14) | (u32::from(morsels[3]) << 8);
 
         // if there are bits set outside the bits we care about, last symbol encodes trailing bits that
         // will not be included in the output
         let mask = !0_u32 >> (leftover_bytes_to_append * 8);
         if !decode_allow_trailing_bits && (leftover_num & mask) != 0 {
             // last morsel is at `morsels_in_leftover` - 1
-            return Err(Error::InvalidLastSymbol(
-                input_index + morsels_in_leftover - 1,
-                last_symbol,
-            ));
+            return Err(Error::InvalidLastSymbol(input_index + morsels_in_leftover - 1, last_symbol));
         }
 
         // Strangely, this approach benchmarks better than writing bytes one at a time,
@@ -960,9 +862,7 @@ pub(crate) mod decode {
         for _ in 0..leftover_bytes_to_append {
             let hi_byte = (leftover_num >> 24) as u8;
             leftover_num <<= 8;
-            *output
-                .get_mut(output_index)
-                .ok_or(Error::OutputSliceTooSmall)? = hi_byte;
+            *output.get_mut(output_index).ok_or(Error::OutputSliceTooSmall)? = hi_byte;
             output_index += 1;
         }
 
