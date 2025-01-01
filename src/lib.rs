@@ -14,7 +14,7 @@ pub enum EngineKind {
 }
 
 /// Encode bytes to base64 string.
-#[cfg(any(feature = "alloc"))]
+#[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u8]>>(bytes: T, engine: EngineKind) -> String {
     match engine {
         EngineKind::Standard => STANDARD.encode(bytes),
@@ -39,7 +39,7 @@ pub fn encode_slice<T: AsRef<[u8]>>(
 }
 
 /// Decode base64 string to bytes.
-#[cfg(any(feature = "alloc"))]
+#[cfg(feature = "alloc")]
 pub fn decode<T: AsRef<[u8]>>(b64str: T, engine: EngineKind) -> Result<Vec<u8>, Error> {
     match engine {
         EngineKind::Standard => STANDARD.decode(b64str),
@@ -78,7 +78,7 @@ pub(crate) trait Engine: Send + Sync {
         decode_estimate: Self::DecodeEstimate,
     ) -> Result<DecodeMetadata, Error>;
 
-    #[cfg(any(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode<T: AsRef<[u8]>>(&self, input: T) -> String {
         fn inner<E: Engine + ?Sized>(engine: &E, input_bytes: &[u8]) -> String {
@@ -122,7 +122,7 @@ pub(crate) trait Engine: Send + Sync {
         inner(self, input.as_ref(), output_buf)
     }
 
-    #[cfg(any(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode<T: AsRef<[u8]>>(&self, input: T) -> Result<Vec<u8>, Error> {
         fn inner<E: Engine + ?Sized>(engine: &E, input_bytes: &[u8]) -> Result<Vec<u8>, Error> {
