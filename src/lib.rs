@@ -13,6 +13,17 @@ pub enum EngineKind {
     UrlSafeNoPad,
 }
 
+impl EngineKind {
+    pub fn padding(&self) -> bool {
+        match self {
+            EngineKind::Standard => true,
+            EngineKind::StandardNoPad => false,
+            EngineKind::UrlSafe => true,
+            EngineKind::UrlSafeNoPad => false,
+        }
+    }
+}
+
 /// Encode bytes to base64 string.
 #[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u8]>>(bytes: T, engine: EngineKind) -> String {
