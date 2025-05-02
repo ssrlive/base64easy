@@ -15,7 +15,7 @@ mod tests {
     ) {
         // let the short ones be short but don't let it get too crazy large
         let num_rounds = calculate_number_of_rounds(byte_len, approx_values_per_byte, max_rounds);
-        let mut r = rand::rngs::SmallRng::from_entropy();
+        let mut r = rand::rngs::SmallRng::from_rng(&mut rand::rng());
         let mut decode_buf = Vec::new();
 
         for _ in 0..num_rounds {
@@ -23,7 +23,7 @@ mod tests {
             str_buf.clear();
             decode_buf.clear();
             while byte_buf.len() < byte_len {
-                byte_buf.push(r.gen::<u8>());
+                byte_buf.push(r.random::<u8>());
             }
 
             *str_buf = encode(&byte_buf, engine);

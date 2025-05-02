@@ -1,6 +1,6 @@
 [package]
 name = "base64easy"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 rust-version = "1.56"
 authors = ["ssrlive"]
@@ -24,4 +24,4 @@ std = ["alloc"]
 [dependencies]
 
 [dev-dependencies]
-rand = { version = "0.8", features = ["small_rng"] }
+rand = { version = "0.9", features = ["small_rng"] }
