@@ -923,11 +923,11 @@ pub(crate) mod error {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match self {
                 Self::InvalidByte(index, byte) => {
-                    write!(f, "Invalid symbol {}, offset {}.", byte, index)
+                    write!(f, "Invalid symbol {byte}, offset {index}.")
                 }
-                Self::InvalidLength(len) => write!(f, "Invalid input length: {}", len),
+                Self::InvalidLength(len) => write!(f, "Invalid input length: {len}"),
                 Self::InvalidLastSymbol(index, byte) => {
-                    write!(f, "Invalid last symbol {}, offset {}.", byte, index)
+                    write!(f, "Invalid last symbol {byte}, offset {index}.")
                 }
                 Self::InvalidPadding => write!(f, "Invalid padding"),
                 Self::OutputSliceTooSmall => write!(f, "Output slice too small"),
